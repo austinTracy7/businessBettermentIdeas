@@ -1,0 +1,130 @@
+/* The following relies on the D3JSVisual that isn't a standard visual but available in Microsoft AppSource.
+
+Warning
+The current implementation has a bug that is increasing a single value randomly by 1...
+*/
+
+/* 
+ * Input Description:
+ *     - x: This represents the categorical data used as labels for the bars in the chart. 
+ *          Each unique label in 'x' corresponds to a separate bar on the chart.
+ *
+ *     - y: This is the numerical measure associated with each label in 'x'. 
+ *          It determines the height of each bar in the chart. 
+ * 			There must be at least 4 data points for this to work because the top 3 are compared against
+ *			the 4th for any possible ties that would not otherwise be acknowledged.
+ *
+ * All D3 visuals run in a frame with the following elements/variables:
+ * 
+ * SVG element: 
+ * - <svg xmlns="http://www.w3.org/2000/svg" class="chart" id="chart" >
+ * 
+ * pbi object:
+ * - 'dsv'    : function that retrieves the data via the provided callback: pbi.dsv(callback)
+                e.g. pbi.dsv(function(data) { //Process data function });
+ * 
+ * Code was modified from original D3 visual that was here. 
+ */
+
+var margin = {top: 20, right: 30, bottom: 10, left: 30},
+    width = pbi.width // Removed margins from this computation so as to allow the chart to center properly.
+    height = pbi.height - margin.top - margin.bottom;
+
+var x = d3.scale.ordinal()
+    .rangeRoundBands([0, width], 0.1, 0.2);
+
+var y = d3.scale.linear()
+    .range([height, 0]);
+
+var svg = d3.select("#chart")
+    .attr("width", width) // Did not add back in the margins here for congruence in not removing them in the first place.
+    .attr("height", height + margin.top + margin.bottom);
+
+pbi.dsv(type, function(pbi_data) {
+    pbi_data = pbi_data.sort(function(a, b) {
+        return b.y - a.y;
+    });
+  
+    // Swap the first two so that the highest value comes in the middle
+    pbi_data.splice(0, 2, pbi_data[1], pbi_data[0]);
+
+    x.domain(pbi_data.slice(0, 3).map(function(d) { return d.x; }));
+    y.domain([0, d3.max(pbi_data, function(d) { return d.y; }) * 1.1]);
+	
+    var bars = svg.selectAll(".bar")
+        .data(pbi_data.slice(0, 3))
+        .enter()
+        .append("g");
+  
+  	bars.append("rect")
+        .style("fill", function(d, i) {
+            if (i === 0){
+              if (pbi_data[0].y < pbi_data[1].y){
+              	return "silver";
+              } else {
+                return "gold";
+              }
+            }
+            else if (i === 1) return "gold";
+            else {
+              if (pbi_data[2].y < pbi_data[1].y){
+              	return "#CD7F32";
+              } else if (pbi_data[0].y < pbi_data[1].y){
+                return "silver";
+              } else {
+                return "gold";
+              }
+            };
+        })
+        .attr("x", function(d) { return x(d.x); })
+        .attr("width", x.rangeBand())
+        .attr("y", function(d) { return y(d.y); })
+        .attr("height", function(d) { return height - y(d.y); });
+
+    // Putting the x values at the top corresponding to people on the so called olympic podium
+    bars.append("text")
+        .attr("class", "label")
+        .attr("x", function(d) { return x(d.x) + x.rangeBand() / 2; })
+        .attr("y", function(d) { return y(d.y) - 5; })
+        .attr("text-anchor", "middle")
+        .text(function(d, i) {
+            if (i === 0){
+                if (pbi_data[0].y > pbi_data[3].y) {
+                    return d.x;
+                } else {
+                    return "Various contestants"
+                }
+            }
+            else if (i === 1) {
+                if (pbi_data[1].y > pbi_data[3].y) {
+                    return d.x;
+                } else {
+                    return "Various contestants"
+                }
+            }
+            else {
+              if (pbi_data[2].y > pbi_data[3].y) {
+                    return d.x;
+                } else {
+                    return "Various contestants"
+                }
+            };
+        })
+            
+  		.style("font-weight", "bold")
+  		.style("font-size", "20px");
+  	
+  	// Putting the y values nearby, but within the bars
+    bars.append("text")
+        .attr("class", "label")
+        .attr("x", function(d) { return x(d.x) + x.rangeBand() / 2; })
+        .attr("y", function(d) { return (y(d.y) + 25); })
+        .attr("text-anchor", "middle")
+        .text(function(d) { return d.y});
+});
+
+// Convert the y values to numbers
+function type(d) {
+    d.y = +d.y;
+    return d;
+}
